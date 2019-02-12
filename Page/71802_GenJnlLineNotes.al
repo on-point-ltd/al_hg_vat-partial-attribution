@@ -4,6 +4,7 @@ page 71802 "Gen. Journal Line Note"
     ApplicationArea = All;
     UsageCategory = Lists;
     SourceTable = "Gen. Jnl. Line Note";
+    Editable = false;
 
     layout
     {
@@ -47,6 +48,50 @@ page 71802 "Gen. Journal Line Note"
                 {
                     ApplicationArea = All;
                 }
+                field("Blocked VAT";"Blocked VAT")
+                {
+                    ApplicationArea = All;
+                }
+                field("Is Error";"Is Error")
+                {
+                    ApplicationArea = All;
+                }
+                field("Error Message";"Error Message")
+                {
+                    ApplicationArea = All;
+                }
+            }
+        }
+    }
+
+    actions
+    {
+        area(Processing)
+        {
+            action("clearLines")
+            {
+                ApplicationArea = All;
+                Caption = 'Remove Existing';
+                
+                trigger OnAction()
+                begin
+                    deleteall();
+                end;
+            }
+            action("setErr")
+            {
+                ApplicationArea = All;
+                Caption = 'Set Lines with Err.';
+
+                trigger OnAction()
+                begin
+                    if FindSet() then
+                        repeat
+                            "Is Error" := true;
+                            "Error Message" := 'Err Set Manually.';
+                            Modify();
+                        until Next() = 0;
+                end;
             }
         }
     }

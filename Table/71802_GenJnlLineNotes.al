@@ -32,6 +32,9 @@ table 71802 "Gen. Jnl. Line Note"
         field(80; "VAT Prod. Posting Group"; Code[20]) { }
         field(85; "Shortcut Dimension 1 Code"; Code[20]) { }
         field(90; "Shortcut Dimension 2 Code"; Code[20]) { }
+        field(500; "Is Error"; Boolean) { }
+        field(505; "Error Message"; Text[250]) { }
+        field(510; "Blocked VAT"; Boolean) { }
     }
 
     keys

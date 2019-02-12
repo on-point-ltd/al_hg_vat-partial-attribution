@@ -94,6 +94,7 @@ codeunit 71800 "VAT Partial Attribution"
     begin
         PurchPaySetup.GET;
         if PurchPaySetup."VAT Partial Attribution Active" /*AND NOT VatPartialReady()*/ then begin
+
             if (GenJnlLine."VAT Partial Attribution" = GenJnlLine."VAT Partial Attribution"::"Partial Attribution") then begin
                 if (GenJnlLine."Account Type" = GenJnlLine."Account Type"::"G/L Account") OR (GenJnlLine."Account Type" =
                     GenJnlLine."Account Type"::"Fixed Asset") then begin
@@ -146,95 +147,72 @@ codeunit 71800 "VAT Partial Attribution"
                     end;
                 end;
             end;
+            if GenJnlLine."VAT Partial Attribution" = GenJnlLine."VAT Partial Attribution"::Blocked then begin
+                if (GenJnlLine."Account Type" = GenJnlLine."Account Type"::"G/L Account") OR (GenJnlLine."Account Type" =
+                    GenJnlLine."Account Type"::"Fixed Asset") then begin
+                    if (GenJnlLine."VAT Calculation Type" = GenJnlLine."VAT Calculation Type"::"Normal VAT")
+                        OR (GenJnlLine."VAT Calculation Type" = GenJnlLine."VAT Calculation Type"::"Reverse Charge VAT") then begin
+                        if GLEntry."VAT Amount" <> 0 then begin
+
+                            // PostBlockedVAT := FALSE;
+                            GLEntry."VAT Partial Attribution" := GenJnlLine."VAT Partial Attribution";
+                            // CLEAR(Blocked1GenJnlLine);
+                            GenJnlLineNote.Init();
+                            GenJnlLineNote.Validate("Posting Date", GenJnlLine."Posting Date");
+                            GenJnlLineNote.VALIDATE("Document Type", GenJnlLine."Document Type");
+                            GenJnlLineNote.VALIDATE("Document No.", GenJnlLine."Document No.");
+                            //Blocked1GenJnlLine."VAT Calculation Type" := Blocked1GenJnlLine."VAT Calculation Type"::
+
+                            CLEAR(VATPostingSetup);
+                            IF NOT VATPostingSetup.GET(GenJnlLine."VAT Bus. Posting Group", PurchPaySetup."Adj. VAT Blocked VPPG") THEN  //GenJnlLine."VAT Prod. Posting Group"
+                                ERROR(Text50001, VATPostingSetup.TABLECAPTION, VATPostingSetup.FIELDCAPTION("VAT Bus. Posting Group"), 
+                                GenJnlLine."VAT Bus. Posting Group", VATPostingSetup.FIELDCAPTION("VAT Prod. Posting Group"), PurchPaySetup."VAT Partial Attribution VPPG");
+
+                            GenJnlLineNote.VALIDATE("Account No.", GetBalAccNo(GenJnlLine."VAT Bus. Posting Group", GenJnlLine."VAT Prod. Posting Group", VATPostingSetup."Purchase VAT Account")); //VATPostingSetup."Purchase VAT Account"
+
+                            GenJnlLineNote.VALIDATE(Description, Text50004);
+                            GenJnlLineNote.VALIDATE(Amount, -GLEntry."VAT Amount");
+                            //Blocked1GenJnlLine.VALIDATE("VAT Amount", GLEntry."VAT Amount");
+
+                            GenJnlLineNote.VALIDATE("Gen. Posting Type", GenJnlLine."Gen. Posting Type");
+                            //Blocked1GenJnlLine.VALIDATE("Bal. Gen. Posting Type", GenJnlLine."Bal. Gen. Posting Type");
+                            GenJnlLineNote.VALIDATE("Gen. Bus. Posting Group", GenJnlLine."Gen. Bus. Posting Group");
+                            GenJnlLineNote.VALIDATE("Gen. Prod. Posting Group", GenJnlLine."Gen. Prod. Posting Group");
+
+                            GenJnlLineNote.VALIDATE("Bal. Account Type", GenJnlLine."Account Type");
+                            GenJnlLineNote."Bal. Account No." := GenJnlLine."Account No.";
+                            //Blocked1GenJnlLine.VALIDATE("VAT Calculation Type", Blocked1GenJnlLine."VAT Calculation Type"::"Full VAT");
+                            //Blocked1GenJnlLine.VALIDATE("Bal. VAT Calculation Type", Blocked1GenJnlLine."Bal. VAT Calculation Type"::"Normal VAT");
+
+                            GenJnlLineNote.VALIDATE("FA Posting Type", GenJnlLine."FA Posting Type");
+                            GenJnlLineNote.VALIDATE("Depreciation Book Code", GenJnlLine."Depreciation Book Code");
+                            GenJnlLineNote.VALIDATE("VAT Bus. Posting Group", GenJnlLine."VAT Bus. Posting Group");
+                            GenJnlLineNote.VALIDATE("VAT Prod. Posting Group", PurchPaySetup."Adj. VAT Blocked VPPG"); //GenJnlLine."VAT Prod. Posting Group"
+
+                            GenJnlLineNote.VALIDATE("Shortcut Dimension 1 Code", GenJnlLine."Shortcut Dimension 1 Code");
+                            GenJnlLineNote.VALIDATE("Shortcut Dimension 2 Code", GenJnlLine."Shortcut Dimension 2 Code");
+
+                            GenJnlLineNote."Blocked VAT" := true;
+
+                            GenJnlLineNote.Insert();
+
+                        end;
+                    end;
+                end;
+            end;
         end;
     end;
 
-    [EventSubscriber(ObjectType::Codeunit, codeunit::"Gen. Jnl.-Post Line", 'OnAfterHandleAddCurrResidualGLEntry', '', true, true)]
-    LOCAL PROCEDURE HandleAddCurrBlockedGLEntry(GenJournalLine: Record "Gen. Journal Line"; GLEntry2: Record "G/L Entry")
-    VAR
-      GLAcc : Record "G/L Account";
-      lGLEntry : Record "G/L Entry";
-      VATPostingSetup : Record "VAT Posting Setup";
-      VATPartialAttrRates : Record "VAT Partial Attribution Rates";
-      PurchPaySetup: Record "Purchases & Payables Setup";
-      GenJnlPostLine: Codeunit "Gen. Jnl.-Post Line";
-      BlockedVatApplied: Boolean;
-      NextEntryNo: Integer;
-      NextTransactionNo: Integer;
-    BEGIN
-      //002-
-
-      IF (GenJournalLine."VAT Partial Attribution" = GenJournalLine."VAT Partial Attribution"::Blocked) AND (NOT BlockedVatApplied) THEN BEGIN
-        NextEntryNo := GLEntry2."Entry No.";
-        VATPostingSetup.GET(GenJournalLine."VAT Bus. Posting Group",GenJournalLine."VAT Prod. Posting Group");
-        PurchPaySetup.GET;
-        lGLEntry.INIT;
-        lGLEntry.CopyFromGenJnlLine(GenJournalLine);
-        lGLEntry."External Document No." := '';
-        lGLEntry.VALIDATE("Posting Date", GenJournalLine."Posting Date");
-        lGLEntry.VALIDATE("Document Type", GenJournalLine."Document Type");
-        lGLEntry.VALIDATE("Document No.", GenJournalLine."Document No.");
-        CLEAR(VATPostingSetup);
-        IF NOT VATPostingSetup.GET(GenJournalLine."VAT Bus. Posting Group", PurchPaySetup."Adj. VAT Blocked VPPG") THEN
-              ERROR(Text50001, VATPostingSetup.TABLECAPTION, VATPostingSetup.FIELDCAPTION("VAT Bus. Posting Group"),
-                GenJournalLine."VAT Bus. Posting Group", VATPostingSetup.FIELDCAPTION("VAT Prod. Posting Group"), PurchPaySetup."Adj. VAT Blocked VPPG");
-        lGLEntry.VALIDATE("G/L Account No.", VATPostingSetup."Purchase VAT Account");
-        lGLEntry.VALIDATE(Description, STRSUBSTNO(Text50004, VATPartialAttrRates."Provisional Rate"));
-        lGLEntry."Bal. Account No." := VATPostingSetup."Purchase VAT Account";
-        lGLEntry."G/L Account No." := VATPostingSetup."Blocked VAT Acc.";
-        lGLEntry.VALIDATE("Gen. Posting Type", GenJournalLine."Gen. Posting Type");
-        lGLEntry.VALIDATE("Gen. Bus. Posting Group", GenJournalLine."Gen. Bus. Posting Group");
-        lGLEntry.VALIDATE("Gen. Prod. Posting Group", GenJournalLine."Gen. Prod. Posting Group");
-        lGLEntry.VALIDATE("VAT Bus. Posting Group", GenJournalLine."VAT Bus. Posting Group");
-        lGLEntry.VALIDATE("VAT Prod. Posting Group", PurchPaySetup."Adj. VAT Blocked VPPG");
-        lGLEntry."Source Type" := 0;
-        lGLEntry."Source No." := '';
-        lGLEntry."Job No." := '';
-        lGLEntry.Quantity := 0;
-        lGLEntry.Amount := GenJournalLine."VAT Amount";
-        NextEntryNo := NextEntryNo + 1;
-        lGLEntry."Entry No." := NextEntryNo;
-        NextEntryNo := NextEntryNo + 1;
-        lGLEntry."Transaction No." := NextTransactionNo;
-        lGLEntry."System-Created Entry" := FALSE;
-        GenJnlPostLine.InsertGLEntry(GenJournalLine, lGLEntry, false);
-
-        //blocked VAT
-        lGLEntry.INIT;
-        lGLEntry.CopyFromGenJnlLine(GenJournalLine);
-        lGLEntry."External Document No." := '';
-        lGLEntry.VALIDATE("Posting Date", GenJournalLine."Posting Date");
-        lGLEntry.VALIDATE("Document Type", GenJournalLine."Document Type");
-        lGLEntry.VALIDATE("Document No.", GenJournalLine."Document No.");
-        CLEAR(VATPostingSetup);
-        IF NOT VATPostingSetup.GET(GenJournalLine."VAT Bus. Posting Group", PurchPaySetup."Adj. VAT Blocked VPPG") THEN
-              ERROR(Text50001, VATPostingSetup.TABLECAPTION, VATPostingSetup.FIELDCAPTION("VAT Bus. Posting Group"),
-                GenJournalLine."VAT Bus. Posting Group", VATPostingSetup.FIELDCAPTION("VAT Prod. Posting Group"), PurchPaySetup."Adj. VAT Blocked VPPG");
-        lGLEntry.VALIDATE("G/L Account No.", VATPostingSetup."Purchase VAT Account");
-        lGLEntry.VALIDATE(Description, STRSUBSTNO(Text50004, VATPartialAttrRates."Provisional Rate"));
-        lGLEntry."Bal. Account No." := VATPostingSetup."Blocked VAT Acc.";
-        lGLEntry."G/L Account No." := VATPostingSetup."Purchase VAT Account";
-        lGLEntry.VALIDATE("Gen. Posting Type", GenJournalLine."Gen. Posting Type");
-        lGLEntry.VALIDATE("Gen. Bus. Posting Group", GenJournalLine."Gen. Bus. Posting Group");
-        lGLEntry.VALIDATE("Gen. Prod. Posting Group", GenJournalLine."Gen. Prod. Posting Group");
-        lGLEntry.VALIDATE("VAT Bus. Posting Group", GenJournalLine."VAT Bus. Posting Group");
-        lGLEntry.VALIDATE("VAT Prod. Posting Group", PurchPaySetup."Adj. VAT Blocked VPPG");
-        lGLEntry."Source Type" := 0;
-        lGLEntry."Source No." := '';
-        lGLEntry."Job No." := '';
-        lGLEntry.Quantity := 0;
-        lGLEntry.Amount := - GenJournalLine."VAT Amount";
-        NextEntryNo := NextEntryNo + 1;
-        lGLEntry."Entry No." := NextEntryNo;
-        NextEntryNo := NextEntryNo + 1;
-        lGLEntry."Transaction No." := NextTransactionNo;
-        lGLEntry."System-Created Entry" := FALSE;
-        GenJnlPostLine.InsertGLEntry(GenJournalLine, lGLEntry, false);
-        CheckGLAccDimError(GenJournalLine,lGLEntry."G/L Account No.");
-        BlockedVatApplied := TRUE;
-      END;
-      //002-
-    END;
+    local procedure GetBalAccNo(VatBus: Code[20]; VatProd: Code[20]; VatAccNo: Code[20]) BalAccNo: Code[20]
+    var
+        VatPostingSetup: Record "VAT Posting Setup";
+    begin
+        if VatPostingSetup.get(VatBus,VatProd) then
+            // exit(VatPostingSetup."Purchase VAT Account")
+            exit(VatAccNo)
+        else
+            exit(VatAccNo);
+    end;
 
     local procedure CheckGLAccDimError(GenJnlLine: Record "Gen. Journal Line"; GLAccNo: Code[20])
     var
@@ -267,6 +245,7 @@ codeunit 71800 "VAT Partial Attribution"
         GenJnlLine: Record "Gen. Journal Line";
         GenJnlPostLine: Codeunit "Gen. Jnl.-Post Line";
     begin
+        GenJnlLineNote.SetRange("Is Error", false);
         if GenJnlLineNote.FindSet() then begin
             repeat
                 GenJnlLine.init;
@@ -290,9 +269,15 @@ codeunit 71800 "VAT Partial Attribution"
                 GenJnlLine.Validate("VAT Prod. Posting Group", GenJnlLineNote."VAT Prod. Posting Group");
                 GenJnlLine.Validate("Shortcut Dimension 1 Code", GenJnlLineNote."Shortcut Dimension 1 Code");
                 GenJnlLine.Validate("Shortcut Dimension 2 Code", GenJnlLineNote."Shortcut Dimension 2 Code");
+                GenJnlLine."System-Created Entry" := true;
 
                 if GenJnlPostLine.RunWithCheck(GenJnlLine) > 0 then
-                    GenJnlLineNote.Delete();
+                    GenJnlLineNote.Delete()
+                else begin
+                    GenJnlLineNote."Is Error" := true;
+                    GenJnlLineNote."Error Message" := 'Error On Posting VAT Partial.';
+                    GenJnlLineNote.Modify();
+                end;
             until GenJnlLineNote.next = 0;
         end;
     end;
@@ -312,4 +297,35 @@ codeunit 71800 "VAT Partial Attribution"
         Text50001: Label 'Error: %1 with %2 %3 and %4 %5 does not exist';       
         Text50004: Label 'Extra Blocked VAT Entry';
         DimensionUsedErr: Label 'A dimension used in %1 %2, %3, %4 has caused an error. %5.';
+
+
+//-------------------------------------------------------------------------------------------------
+//---> DEBUG Tools
+//-------------------------------------------------------------------------------------------------
+    local procedure dbg_GJL(GJL: Record "Gen. Journal Line"; OrdNo: Integer)
+    var
+        tb: TextBuilder;
+    begin
+        tb.Clear();
+        tb.Append(StrSubstNo('dbg_GJL (%1):\', OrdNo));
+        tb.Append(StrSubstNo('Document: [%1] [%2]\', GJL."Document Type", GJL."Document No."));
+        tb.Append(StrSubstNo('VAT Partial Attr: [%1]\', GJL."VAT Partial Attribution"));
+        tb.Append((StrSubstNo('Amount: [%1]\', GJL.Amount)));
+        tb.Append(StrSubstNo('Description: [%1]\', GJL.Description));
+        Message(tb.ToText());
+    end;
+
+    local procedure dbg_GLE(GLE: Record "G/L Entry"; OrdNo: Integer)
+    var
+        tb: TextBuilder;
+    begin
+        tb.Clear();
+        tb.Append(StrSubstNo('dbg_GLE (%1):\', OrdNo));
+        tb.Append(StrSubstNo('Entry No.: [%1]\', GLE."Entry No."));
+        tb.Append(StrSubstNo('Amount / VAT Amount: [%1] / [%2]\', GLE.Amount, GLE."VAT Amount"));
+        tb.Append(StrSubstNo('VAT Partial Attribution: [%1]\', GLE."VAT Partial Attribution"));
+        tb.Append(StrSubstNo('Description : [%1]\', GLE.Description));
+        Message(tb.ToText());
+    end;
+    
 }

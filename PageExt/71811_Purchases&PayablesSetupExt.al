@@ -67,17 +67,17 @@ pageextension 71811 "Purchases & Payables Setup Ext" extends "Purchases & Payabl
 
             //     end;
             // }
-            // action("Show Gen. Jnl Line Notes")
-            // {
-            //     ApplicationArea = All;
-            //     Image = Action;
-            //     Promoted = true;
-            //     PromotedCategory = Process;
-            //     trigger OnAction()
-            //     begin
-            //         page.run(page::"Gen. Journal Line Note");
-            //     end;
-            // }
+            action("Show Gen. Jnl Line Notes")
+            {
+                ApplicationArea = All;
+                Image = Action;
+                Promoted = true;
+                PromotedCategory = Process;
+                trigger OnAction()
+                begin
+                    page.run(page::"Gen. Journal Line Note");
+                end;
+            }
         }
     }
 }

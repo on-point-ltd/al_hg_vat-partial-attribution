@@ -4,7 +4,7 @@
   "publisher": "OnPoint Ltd.",
   "brief": "",
   "description": "",
-  "version": "1.0.0.5",
+  "version": "1.0.0.16",
   "privacyStatement": "",
   "EULA": "",
   "help": "",
@@ -19,5 +19,6 @@
     "from": 71800,
     "to": 71899
   },
-  "runtime": "2.1"
+  "runtime": "2.1",
+  "showMyCode": true
 }
